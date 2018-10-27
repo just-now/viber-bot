@@ -6,75 +6,93 @@ from transitions import State
 from keyboard import Keyboard
 from rutils import RequestPayloadUT
 
+
 import re
 import unittest
+import datetime
 
-CMD_REGISTER = "Register"
-CMD_ADD_HOME = "AddHome"
+CMD_REG_TEL          = "Register"
+CMD_ADD_HOME_FLAT_NR = "AddHomeFlat"
+CMD_ADD_CAR_NR       = "AddCar"
+CMD_ADD_NAME         = "AddName"
 
-NEW_USER_IDENTIFY="""
+TXT_IDENTIFY__NEW_USER="""
 Кажется, Вы новый пользователь...
 """
-
-NEW_USER_REGISTRATION="""
-Для использования бота Вам будет необходимо пройти процедуру
-регистрации.  Вам будет предложено ввести Ваше ФИО и номер телефона.
-
-Теперь, введите Ваше ФИО:
+TXT_REG_TEL_NR="""
+Введите ваш номер телефона:
+"""
+TXT_GOT_TEL_NR="""
+Для подтверждения актуальности Ваших данных, необходимо с регистрируемого
+телефона отправить на номер {} СМС с проверочным кодом {}.
+"""
+TXT_ADD_HOME_FL_NR="""
+Введите ваш номер дома и квартиры в формате '4-Д,197':
+"""
+TXT_GOT_HOME_FL_NR="""
+Спасибо.
+"""
+TXT_ADD_CAR_NR="""
+Введите номер вашей машины в формате 'ХХ1111ХХ':
+"""
+TXT_GOT_CAR_NR="""
+Спасибо.
+"""
+TXT_ADD_NAME="""
+Введите ваше имя:
+"""
+TXT_GOT_NAME="""
+Спасибо.
 """
 
-NEW_USER_GOT_PERSONAL_NAME="""
-Теперь, когда Ваше ФИО введено, введите Ваш номер телефона:
-"""
 
-NEW_USER_PROCESS_PN_TNR="""
-Ваши данные введены.
-Для подтверждения актуальности Ваших данных, необходимо с
-регистрируемого телефона отправить на номер +38077-777-5555 СМС с
-подтверждающим регистрацию проверочным кодом.
-
-Вот этот код:
-{}
-"""
 
 # ---
 class Request(object):
-    def telephone_nr_is_valid(self):
-        print("telephone_nr_is_valid()")
+
+    # --- validity checks ---
+    def is_tel_nr_valid(self):
+        print("is_telephone_nr_valid()")
         self._user_telephone = self._payload.text()
         return not re.match(r'[+]380\d{2}\d{7}', self._user_telephone) is None
 
-    def personal_name_is_valid(self):
-        print("personal_name_is_valid()")
+    def is_user_name_valid(self):
+        print("is_user_name_valid()")
         self._user_name = self._payload.text()
-        return not re.match(r'\w+ \w+ \w+', self._user_name) is None
+        return not re.match(r'\w+', self._user_name) is None
 
-    def home_nr_is_valid(self):
-        print("home_nr_is_valid()")
-        self._user_name = self._payload.text()
-        return not re.match(r'4-[БВГД]', self._user_name) is None
-
-    def home_nr_is_valid(self):
-        print("flat_nr_is_valid()")
-        self._user_name = self._payload.text()
-        return not re.match(r'\d+', self._user_name) is None
-
-    def tries_not_acceptable(self):
+    def is_home_flat_valid(self):
+        print("is_home_flat_valid()")
         return True
+
+    def is_car_valid(self):
+        print("is_car_valid()")
+        return True
+
+    def is_cmd(self, stype):
+        print("is_cmd({})".format(stype))
+        cmd = self._payload.text()
+        return cmd == "{{" + stype + "}}"
+
+    def is_reg_tel_cmd(self):
+        return self.is_cmd(CMD_REG_TEL)
+
+    def is_add_home_flat_cmd(self):
+        return self.is_cmd(CMD_ADD_HOME_FLAT_NR)
+
+    def is_add_name_cmd(self):
+        return self.is_cmd(CMD_ADD_NAME)
+
+    def is_add_car_cmd(self):
+        return self.is_cmd(CMD_ADD_CAR_NR)
+
+    def is_unknown_cmd(self):
+        return False
 
     def db_failed(self):
         return False
 
-    def is_reg_cmd(self):
-        print("is_reg_cmd()")
-        cmd = self._payload.text()
-        return cmd == "{{" + CMD_REGISTER + "}}"
-
-    def is_add_home_cmd(self):
-        print("is_reg_cmd()")
-        cmd = self._payload.text()
-        return cmd == "{{" + CMD_ADD_HOME + "}}"
-
+    # --- on enter ---
     def on_enter_IDENTIFY(self):
         print("on_enter state={}".format(self.state))
         # put sql queries into data base
@@ -83,39 +101,59 @@ class Request(object):
         self._user_identified = False
         self._user_confirmed  = False
         self._need_input      = True
+        self._message_out     = TXT_IDENTIFY__NEW_USER
+        self._kb_out          = Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
+                                          Keyboard.cmd_button(CMD_ADD_NAME),
+                                          Keyboard.cmd_button(CMD_ADD_CAR_NR),
+                                          Keyboard.cmd_button(CMD_ADD_HOME_FLAT_NR)])
+    # ---
+    def generateConfirmationCode(self):
+        stime = str(datetime.datetime.timestamp(datetime.datetime.now()))
+        return str(stime).replace('.','')[-5:]
 
-        if not self._user_identified and not self._user_confirmed:
-            self._message_out = NEW_USER_IDENTIFY
-            self._kb_out = Keyboard([Keyboard.cmd_button(CMD_REGISTER)])
-
-    def on_enter_REGISTRATION(self):
+    def on_enter_REG_TEL_NR(self):
         print("on_enter state={}".format(self.state))
-        if not self._user_identified and not self._user_confirmed:
-            self._message_out = NEW_USER_REGISTRATION
-            self._kb_out = Keyboard([])
+        self._message_out = TXT_REG_TEL_NR
+        self._kb_out = Keyboard([])
 
-    def on_enter_GOT_PERSONAL_NAME(self):
+    def on_enter_GOT_TEL_NR(self):
         print("on_enter state={}".format(self.state))
-        if not self._user_identified and not self._user_confirmed:
-            self._message_out = NEW_USER_GOT_PERSONAL_NAME
-            self._kb_out = Keyboard([])
+        self._confirmation_code = self.generateConfirmationCode()
+        self._need_input        = False
+        self._message_out       = TXT_GOT_TEL_NR
+    # ---
+    def on_enter_ADD_HOME_FL_NR(self):
+        print("on_enter state={}".format(self.state))
+        self._message_out = TXT_ADD_HOME_FL_NR
+        self._kb_out = Keyboard([])
 
-    def on_enter_PROCESS_PN_TNR(self):
-        # put information user inputed into database
-        print("on_enter state={}".format(self.state))
-        self._need_input = False
-        self._message_out = NEW_USER_PROCESS_PN_TNR
-        self._kb_out = Keyboard([Keyboard.cmd_button('Check-If-Registered')])
-
-    def on_enter_ADD_HOME_NR(self):
-        print("on_enter state={}".format(self.state))
+    def on_enter_GOT_HOME_FL_NR(self):
+        self._need_input  = False
+        self._message_out = TXT_GOT_HOME_FL_NR
         pass
-    def on_enter_ADD_FLAT_NR(self):
+    # ---
+    def on_enter_ADD_CAR_NR(self):
         print("on_enter state={}".format(self.state))
+        self._message_out = TXT_ADD_CAR_NR
+        self._kb_out = Keyboard([])
+
+    def on_enter_GOT_CAR_NR(self):
+        self._need_input  = False
+        self._message_out = TXT_GOT_CAR_NR
         pass
-    def on_enter_PROCESS_ADD_HNR_FNR(self):
+    # ---
+    def on_enter_ADD_NAME(self):
         print("on_enter state={}".format(self.state))
+        self._message_out = TXT_ADD_NAME
+        self._kb_out = Keyboard([])
+
+    def on_enter_GOT_NAME(self):
+        self._need_input  = False
+        self._message_out = TXT_GOT_NAME
         pass
+    # ---
+    def on_enter_UPDATE_DB(self):
+        print("on_enter state={}".format(self.state))
 
     def on_enter_ERROR(self):
         print("on_enter state={}".format(self.state))
@@ -127,68 +165,58 @@ class Request(object):
     def _init_sm(self):
         states = ['NEW', 'IDENTIFY',
 
-                  'REGISTRATION', 'GOT_PERSONAL_NAME', 'PROCESS_PN_TNR',
-                  'ADD_HOME_NR', 'ADD_FLAT_NR', 'PROCESS_ADD_HNR_FNR',
-                  #'ADD_CAR_NR', 'PROCESS_ADD_CNR',
-                  #'DEL_CAR_NR', 'PROCESS_ADD_CNR',
-                  #'DEL_HOUSE_NR', 'DEL_FLAT_NR', 'PROCESS_DEL_HNR_FNR',
+                  'REG_TEL_NR',     'GOT_TEL_NR',
+                  'ADD_HOME_FL_NR', 'GOT_HOME_FL_NR',
+                  'ADD_CAR_NR',     'GOT_CAR_NR',
+                  'ADD_NAME',       'GOT_NAME',
 
+                  'UPDATE_DB',
                   'DELETE',
                   'ERROR']
         #self._machine = Machine(model=self, states=states, initial='NEW')
         self._machine = Machine(model=self, states=states, initial='NEW', show_conditions=True)
         self._machine.add_transition('advance', 'NEW',                'IDENTIFY')
-        # ---
-        self._machine.add_transition('advance', 'IDENTIFY',           'REGISTRATION',
+        # --- IDENTIFY to ALL
+        self._machine.add_transition('advance', 'IDENTIFY',           'REG_TEL_NR',
                                      unless='db_failed',
-                                     conditions='is_reg_cmd')
-        self._machine.add_transition('advance', 'IDENTIFY',           'ERROR',
-                                     conditions='db_failed')
-        self._machine.add_transition('advance', 'IDENTIFY',           'ERROR',
-                                     unless='is_reg_cmd')
-        self._machine.add_transition('advance', 'REGISTRATION',       'REGISTRATION',
-                                     unless=['tries_not_acceptable','personal_name_is_valid'])
-        self._machine.add_transition('advance', 'REGISTRATION',       'GOT_PERSONAL_NAME',
-                                     conditions='personal_name_is_valid')
-        self._machine.add_transition('advance', 'REGISTRATION',       'ERROR',
-                                     unless='personal_name_is_valid',
-                                     conditions='tries_not_acceptable')
-        self._machine.add_transition('advance', 'GOT_PERSONAL_NAME',  'GOT_PERSONAL_NAME',
-                                     unless=['tries_not_acceptable','telephone_nr_is_valid'])
-        self._machine.add_transition('advance', 'GOT_PERSONAL_NAME',  'PROCESS_PN_TNR',
-                                     conditions='telephone_nr_is_valid')
-        self._machine.add_transition('advance', 'GOT_PERSONAL_NAME',  'ERROR',
-                                     unless='telephone_nr_is_valid',
-                                     conditions='tries_not_acceptable')
-        self._machine.add_transition('advance', 'PROCESS_PN_TNR',     'DELETE',
-                                     unless='db_failed')
-        self._machine.add_transition('advance', 'PROCESS_PN_TNR',     'ERROR',
-                                     conditions='db_failed')
-        # ---
-        self._machine.add_transition('advance', 'IDENTIFY',           'ADD_HOME_NR',
+                                     conditions='is_reg_tel_cmd')
+        self._machine.add_transition('advance', 'IDENTIFY',           'ADD_HOME_FL_NR',
                                      unless='db_failed',
-                                     conditions='is_add_home_cmd')
+                                     conditions='is_add_home_flat_cmd')
+        self._machine.add_transition('advance', 'IDENTIFY',           'ADD_CAR_NR',
+                                     unless='db_failed',
+                                     conditions='is_add_car_cmd')
+        self._machine.add_transition('advance', 'IDENTIFY',           'ADD_NAME',
+                                     unless='db_failed',
+                                     conditions='is_add_name_cmd')
         self._machine.add_transition('advance', 'IDENTIFY',           'ERROR',
-                                     unless='is_add_home_cmd')
-        self._machine.add_transition('advance', 'ADD_HOME_NR',        'ADD_HOME_NR',
-                                     unless=['tries_not_acceptable','home_nr_is_valid'])
-        self._machine.add_transition('advance', 'ADD_HOME_NR',        'ADD_FLAT_NR',
-                                     conditions='home_nr_is_valid')
-        self._machine.add_transition('advance', 'ADD_HOME_NR',        'ERROR',
-                                     unless='home_nr_is_valid',
-                                     conditions='tries_not_acceptable')
-        self._machine.add_transition('advance', 'ADD_FLAT_NR',        'ADD_FLAT_NR',
-                                     unless=['tries_not_acceptable','flat_nr_is_valid'])
-        self._machine.add_transition('advance', 'ADD_FLAT_NR',        'PROCESS_ADD_HNR_FNR',
-                                     conditions='flat_nr_is_valid')
-        self._machine.add_transition('advance', 'ADD_FLAT_NR',        'ERROR',
-                                     unless='flat_nr_is_valid',
-                                     conditions='tries_not_acceptable')
-        self._machine.add_transition('advance', 'PROCESS_ADD_HNR_FNR','DELETE',
-                                     unless='db_failed')
-        self._machine.add_transition('advance', 'PROCESS_ADD_HNR_FNR','ERROR',
                                      conditions='db_failed')
+        self._machine.add_transition('advance', 'IDENTIFY',           'ERROR',
+                                     conditions='is_unknown_cmd')
+        # --- TEL_NRs
+        self._machine.add_transition('advance', 'REG_TEL_NR',         'GOT_TEL_NR',
+                                     conditions='is_tel_nr_valid')
+        self._machine.add_transition('advance', 'REG_TEL_NR',         'ERROR')
+        self._machine.add_transition('advance', 'GOT_TEL_NR',         'UPDATE_DB')
+        # --- HOME_FL_NRs
+        self._machine.add_transition('advance', 'ADD_HOME_FL_NR',     'GOT_HOME_FL_NR',
+                                     conditions='is_home_flat_valid')
+        self._machine.add_transition('advance', 'ADD_HOME_FL_NR',     'ERROR')
+        self._machine.add_transition('advance', 'GOT_HOME_FL_NR',     'UPDATE_DB')
+        # --- CAR_NRs
+        self._machine.add_transition('advance', 'ADD_CAR_NR',         'GOT_CAR_NR',
+                                     conditions='is_car_valid')
+        self._machine.add_transition('advance', 'ADD_CAR_NR',         'ERROR')
+        self._machine.add_transition('advance', 'GOT_CAR_NR',         'UPDATE_DB')
+        # --- NAME_NRs
+        self._machine.add_transition('advance', 'ADD_NAME',           'GOT_NAME',
+                                     conditions='is_user_name_valid')
+        self._machine.add_transition('advance', 'ADD_NAME',           'ERROR')
+        self._machine.add_transition('advance', 'GOT_NAME',           'UPDATE_DB')
         #---
+        self._machine.add_transition('advance', 'UPDATE_DB',          'ERROR',
+                                     conditions='db_failed')
+        self._machine.add_transition('advance', 'UPDATE_DB',          'DELETE')
         self._machine.add_transition('advance', 'ERROR',              'DELETE')
 
     # ---- Public ----
@@ -206,21 +234,27 @@ class Request(object):
         self._payload = RequestPayloadUT(payload)
         self._message_out = None
         self._kb_out = None
+
         self._user_identified = None
         self._user_confirmed = None
         self._user_blocked = None
         self._need_input = False
 
-        self._user_telephone=""
-        self._user_name=""
+        self._user_telephone=''
+        self._user_name=''
+        self._confirmation_code=''
+        self._user_home_flat=''
 
         self._init_sm()
 
 
 # ---
 class TestRequest(unittest.TestCase):
+
+
+
     def test_success_registration(self):
-        message = ["MESSAGE_REQUEST", "{{Register}}", "time_12:00", "user_id"]
+        message = ["MESSAGE_REQUEST", "{{"+CMD_REG_TEL+"}}", "time_12:00", "user_id"]
         rq = Request(message)
         # first entering into chat
         # ->incoming() with ViberMessageRequest called
@@ -232,35 +266,189 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq._user_identified is False)
         self.assertTrue(rq._user_confirmed is False)
         self.assertTrue(rq.need_input() is True)
-        self.assertTrue(rq.get_message_out() == NEW_USER_IDENTIFY)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([Keyboard.cmd_button('Register')])))
+        self.assertTrue(rq.get_message_out() == TXT_IDENTIFY__NEW_USER)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
+                                                  Keyboard.cmd_button(CMD_ADD_NAME),
+                                                  Keyboard.cmd_button(CMD_ADD_CAR_NR),
+                                                  Keyboard.cmd_button(CMD_ADD_HOME_FLAT_NR)])))
 
         rq.advance()
-        self.assertTrue(rq.state == 'REGISTRATION')
+        self.assertTrue(rq.state == 'REG_TEL_NR')
         self.assertTrue(rq._user_identified is False)
         self.assertTrue(rq._user_confirmed is False)
         self.assertTrue(rq.need_input() is True)
-        self.assertTrue(rq.get_message_out() == NEW_USER_REGISTRATION)
+        self.assertTrue(rq.get_message_out() == TXT_REG_TEL_NR)
         self.assertTrue(rq.get_kbd().eq(Keyboard([])))
-        message[1] = 'Vsiliy Yetovich Terkin'
-
-        rq.advance()
-        self.assertTrue(rq.state == 'GOT_PERSONAL_NAME')
-        self.assertTrue(rq.get_message_out() == NEW_USER_GOT_PERSONAL_NAME)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
-        self.assertTrue(rq.need_input() is True)
         message[1] = '+380667176666'
 
         rq.advance()
-        self.assertTrue(rq.state == 'PROCESS_PN_TNR')
-        self.assertTrue(rq.get_kbd().eq(Keyboard([Keyboard.cmd_button('Check-If-Registered')])))
-        self.assertTrue(rq.get_message_out() == NEW_USER_PROCESS_PN_TNR)
+        self.assertTrue(rq.state == 'GOT_TEL_NR')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
         self.assertTrue(rq.need_input() is False)
+        self.assertTrue(re.match(r'\d{5}', rq._confirmation_code))
+        self.assertTrue(rq.get_message_out() == TXT_GOT_TEL_NR)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+
+        rq.advance()
+        self.assertTrue(rq.state == 'UPDATE_DB')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is False)
+        self.assertTrue(rq.get_message_out() == TXT_GOT_TEL_NR)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
 
         rq.advance()
         self.assertTrue(rq.state == 'DELETE')
+        self.assertTrue(rq.get_message_out() == TXT_GOT_TEL_NR)
         self.assertTrue(rq.need_input() is True)
 
+    def test_success_AddEstateInfo(self):
+        message = ["MESSAGE_REQUEST", "{{"+CMD_ADD_HOME_FLAT_NR+"}}", "time_12:00", "user_id"]
+        rq = Request(message)
+        # first entering into chat
+        # ->incoming() with ViberMessageRequest called
+        self.assertTrue(rq.state == 'NEW')
+        self.assertTrue(rq.need_input() is False)
+
+        rq.advance()
+        self.assertTrue(rq.state == 'IDENTIFY')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is True)
+        self.assertTrue(rq.get_message_out() == TXT_IDENTIFY__NEW_USER)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
+                                                  Keyboard.cmd_button(CMD_ADD_NAME),
+                                                  Keyboard.cmd_button(CMD_ADD_CAR_NR),
+                                                  Keyboard.cmd_button(CMD_ADD_HOME_FLAT_NR)])))
+
+        rq.advance()
+        self.assertTrue(rq.state == 'ADD_HOME_FL_NR')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is True)
+        self.assertTrue(rq.get_message_out() == TXT_ADD_HOME_FL_NR)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        message[1] = '4Д,197'
+
+        rq.advance()
+        self.assertTrue(rq.state == 'GOT_HOME_FL_NR')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is False)
+        self.assertTrue(rq.get_message_out() == TXT_GOT_HOME_FL_NR)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+
+        rq.advance()
+        self.assertTrue(rq.state == 'UPDATE_DB')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is False)
+        self.assertTrue(rq.get_message_out() == TXT_GOT_HOME_FL_NR)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+
+        rq.advance()
+        self.assertTrue(rq.state == 'DELETE')
+        self.assertTrue(rq.get_message_out() == TXT_GOT_HOME_FL_NR)
+        self.assertTrue(rq.need_input() is True)
+
+    def test_success_AddCarNr(self):
+        message = ["MESSAGE_REQUEST", "{{"+CMD_ADD_CAR_NR+"}}", "time_12:00", "user_id"]
+        rq = Request(message)
+        # first entering into chat
+        # ->incoming() with ViberMessageRequest called
+        self.assertTrue(rq.state == 'NEW')
+        self.assertTrue(rq.need_input() is False)
+
+        rq.advance()
+        self.assertTrue(rq.state == 'IDENTIFY')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is True)
+        self.assertTrue(rq.get_message_out() == TXT_IDENTIFY__NEW_USER)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
+                                                  Keyboard.cmd_button(CMD_ADD_NAME),
+                                                  Keyboard.cmd_button(CMD_ADD_CAR_NR),
+                                                  Keyboard.cmd_button(CMD_ADD_HOME_FLAT_NR)])))
+
+        rq.advance()
+        self.assertTrue(rq.state == 'ADD_CAR_NR')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is True)
+        self.assertTrue(rq.get_message_out() == TXT_ADD_CAR_NR)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        message[1] = 'вн1984не'
+
+        rq.advance()
+        self.assertTrue(rq.state == 'GOT_CAR_NR')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is False)
+        self.assertTrue(rq.get_message_out() == TXT_GOT_CAR_NR)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+
+        rq.advance()
+        self.assertTrue(rq.state == 'UPDATE_DB')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is False)
+        self.assertTrue(rq.get_message_out() == TXT_GOT_CAR_NR)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+
+        rq.advance()
+        self.assertTrue(rq.state == 'DELETE')
+        self.assertTrue(rq.get_message_out() == TXT_GOT_CAR_NR)
+        self.assertTrue(rq.need_input() is True)
+
+    def test_success_AddName(self):
+        message = ["MESSAGE_REQUEST", "{{"+CMD_ADD_NAME+"}}", "time_12:00", "user_id"]
+        rq = Request(message)
+        # first entering into chat
+        # ->incoming() with ViberMessageRequest called
+        self.assertTrue(rq.state == 'NEW')
+        self.assertTrue(rq.need_input() is False)
+
+        rq.advance()
+        self.assertTrue(rq.state == 'IDENTIFY')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is True)
+        self.assertTrue(rq.get_message_out() == TXT_IDENTIFY__NEW_USER)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
+                                                  Keyboard.cmd_button(CMD_ADD_NAME),
+                                                  Keyboard.cmd_button(CMD_ADD_CAR_NR),
+                                                  Keyboard.cmd_button(CMD_ADD_HOME_FLAT_NR)])))
+
+        rq.advance()
+        self.assertTrue(rq.state == 'ADD_NAME')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is True)
+        self.assertTrue(rq.get_message_out() == TXT_ADD_NAME)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        message[1] = 'Анатолий'
+
+        rq.advance()
+        self.assertTrue(rq.state == 'GOT_NAME')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is False)
+        self.assertTrue(rq.get_message_out() == TXT_GOT_NAME)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+
+        rq.advance()
+        self.assertTrue(rq.state == 'UPDATE_DB')
+        self.assertTrue(rq._user_identified is False)
+        self.assertTrue(rq._user_confirmed is False)
+        self.assertTrue(rq.need_input() is False)
+        self.assertTrue(rq.get_message_out() == TXT_GOT_NAME)
+        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+
+        rq.advance()
+        self.assertTrue(rq.state == 'DELETE')
+        self.assertTrue(rq.get_message_out() == TXT_GOT_NAME)
+        self.assertTrue(rq.need_input() is True)
 
 if __name__ == '__main__':
     unittest.main()
