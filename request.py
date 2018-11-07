@@ -11,6 +11,7 @@ import re
 import unittest
 import datetime
 
+
 CMD_REG_TEL          = "Register"
 CMD_ADD_HOME_FLAT_NR = "AddHomeFlat"
 CMD_ADD_CAR_NR       = "AddCar"
@@ -30,22 +31,30 @@ TXT_ADD_HOME_FL_NR="""
 Введите ваш номер дома и квартиры в формате '4-Д,197':
 """
 TXT_GOT_HOME_FL_NR="""
-Спасибо.
+Спасибо. Номер дома и квартиры {} введены.
 """
 TXT_ADD_CAR_NR="""
 Введите номер вашей машины в формате 'ХХ1111ХХ':
 """
 TXT_GOT_CAR_NR="""
-Спасибо.
+Спасибо. Номер машины {} введен.
 """
 TXT_ADD_NAME="""
 Введите ваше имя:
 """
 TXT_GOT_NAME="""
-Спасибо.
+Спасибо. {}, Ваше имя добавлено.
 """
-
-
+ERR_TEL_NR="""
+Убедитесь в правильности ввода телефона.
+"""
+ERR_GENERAL="""
+Неведомая ошибка.
+"""
+KBD_ALL_KEYS=Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
+                       Keyboard.cmd_button(CMD_ADD_NAME),
+                       Keyboard.cmd_button(CMD_ADD_CAR_NR),
+                       Keyboard.cmd_button(CMD_ADD_HOME_FLAT_NR)])
 
 # ---
 class Request(object):
@@ -87,7 +96,10 @@ class Request(object):
         return self.is_cmd(CMD_ADD_CAR_NR)
 
     def is_unknown_cmd(self):
-        return False
+        return not (self.is_reg_tel_cmd()       or \
+                    self.is_add_home_flat_cmd() or \
+                    self.is_add_car_cmd()       or \
+                    self.is_add_name_cmd())
 
     def db_failed(self):
         return False
@@ -100,12 +112,10 @@ class Request(object):
         # set _user_identified and _user_confirmed to an appropriate state according to db
         self._user_identified = False
         self._user_confirmed  = False
-        self._need_input      = True
+        self._need_input      = False
+        self._need_output     = True
         self._message_out     = TXT_IDENTIFY__NEW_USER
-        self._kb_out          = Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
-                                          Keyboard.cmd_button(CMD_ADD_NAME),
-                                          Keyboard.cmd_button(CMD_ADD_CAR_NR),
-                                          Keyboard.cmd_button(CMD_ADD_HOME_FLAT_NR)])
+        self._kb_out          = KBD_ALL_KEYS
     # ---
     def generateConfirmationCode(self):
         stime = str(datetime.datetime.timestamp(datetime.datetime.now()))
@@ -113,6 +123,7 @@ class Request(object):
 
     def on_enter_REG_TEL_NR(self):
         print("on_enter state={}".format(self.state))
+        self._need_input  = True
         self._message_out = TXT_REG_TEL_NR
         self._kb_out = Keyboard([])
 
@@ -120,43 +131,60 @@ class Request(object):
         print("on_enter state={}".format(self.state))
         self._confirmation_code = self.generateConfirmationCode()
         self._need_input        = False
+        self._need_output       = False
         self._message_out       = TXT_GOT_TEL_NR
+        self._kb_out            = KBD_ALL_KEYS
     # ---
     def on_enter_ADD_HOME_FL_NR(self):
         print("on_enter state={}".format(self.state))
+        self._need_input  = True
         self._message_out = TXT_ADD_HOME_FL_NR
         self._kb_out = Keyboard([])
 
     def on_enter_GOT_HOME_FL_NR(self):
         self._need_input  = False
+        self._need_output = False
         self._message_out = TXT_GOT_HOME_FL_NR
+        self._kb_out      = KBD_ALL_KEYS
         pass
     # ---
     def on_enter_ADD_CAR_NR(self):
         print("on_enter state={}".format(self.state))
+        self._need_input  = True
         self._message_out = TXT_ADD_CAR_NR
         self._kb_out = Keyboard([])
 
     def on_enter_GOT_CAR_NR(self):
         self._need_input  = False
+        self._need_output = False
         self._message_out = TXT_GOT_CAR_NR
+        self._kb_out      = KBD_ALL_KEYS
         pass
     # ---
     def on_enter_ADD_NAME(self):
         print("on_enter state={}".format(self.state))
+        self._need_input  = True
         self._message_out = TXT_ADD_NAME
         self._kb_out = Keyboard([])
 
     def on_enter_GOT_NAME(self):
         self._need_input  = False
+        self._need_output = False
         self._message_out = TXT_GOT_NAME
+        self._kb_out      = KBD_ALL_KEYS
         pass
     # ---
     def on_enter_UPDATE_DB(self):
         print("on_enter state={}".format(self.state))
+        self._need_output = False
+        self._need_input  = False
 
     def on_enter_ERROR(self):
         print("on_enter state={}".format(self.state))
+        self._message_out = ERR_GENERAL
+        self._kb_out      = KBD_ALL_KEYS
+        self._need_output = False
+        self._need_input  = False
 
     def on_enter_DELETE(self):
         print("on_enter state={}".format(self.state))
@@ -227,11 +255,23 @@ class Request(object):
     def get_message_out(self):
         return self._message_out
 
+    def get_user_id(self):
+        self._payload.user_id()
+
     def need_input(self):
         return self._need_input
 
+    def need_output(self):
+        return self.need_input() or self._need_output
+
+    def finished(self):
+        return self.state == "DELETE"
+
+    def update_payload(self, payload):
+        self._payload = payload
+
     def __init__(self, payload):
-        self._payload = RequestPayloadUT(payload)
+        self._payload = payload
         self._message_out = None
         self._kb_out = None
 
@@ -239,6 +279,7 @@ class Request(object):
         self._user_confirmed = None
         self._user_blocked = None
         self._need_input = False
+        self._need_output = False
 
         self._user_telephone=''
         self._user_name=''
@@ -251,10 +292,8 @@ class Request(object):
 # ---
 class TestRequest(unittest.TestCase):
 
-
-
     def test_success_registration(self):
-        message = ["MESSAGE_REQUEST", "{{"+CMD_REG_TEL+"}}", "time_12:00", "user_id"]
+        message = RequestPayloadUT(["MESSAGE_REQUEST", "{{"+CMD_REG_TEL+"}}", "time_12:00", "user_id"])
         rq = Request(message)
         # first entering into chat
         # ->incoming() with ViberMessageRequest called
@@ -265,12 +304,9 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.state == 'IDENTIFY')
         self.assertTrue(rq._user_identified is False)
         self.assertTrue(rq._user_confirmed is False)
-        self.assertTrue(rq.need_input() is True)
+        self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_IDENTIFY__NEW_USER)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
-                                                  Keyboard.cmd_button(CMD_ADD_NAME),
-                                                  Keyboard.cmd_button(CMD_ADD_CAR_NR),
-                                                  Keyboard.cmd_button(CMD_ADD_HOME_FLAT_NR)])))
+        self.assertTrue(rq.get_kbd().eq(KBD_ALL_KEYS))
 
         rq.advance()
         self.assertTrue(rq.state == 'REG_TEL_NR')
@@ -279,7 +315,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.need_input() is True)
         self.assertTrue(rq.get_message_out() == TXT_REG_TEL_NR)
         self.assertTrue(rq.get_kbd().eq(Keyboard([])))
-        message[1] = '+380667176666'
+        message._payload[1] = '+380667176666'
 
         rq.advance()
         self.assertTrue(rq.state == 'GOT_TEL_NR')
@@ -288,7 +324,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.need_input() is False)
         self.assertTrue(re.match(r'\d{5}', rq._confirmation_code))
         self.assertTrue(rq.get_message_out() == TXT_GOT_TEL_NR)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        self.assertTrue(rq.get_kbd().eq(KBD_ALL_KEYS))
 
         rq.advance()
         self.assertTrue(rq.state == 'UPDATE_DB')
@@ -296,7 +332,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq._user_confirmed is False)
         self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_GOT_TEL_NR)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        self.assertTrue(rq.get_kbd().eq(KBD_ALL_KEYS))
 
         rq.advance()
         self.assertTrue(rq.state == 'DELETE')
@@ -304,7 +340,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.need_input() is True)
 
     def test_success_AddEstateInfo(self):
-        message = ["MESSAGE_REQUEST", "{{"+CMD_ADD_HOME_FLAT_NR+"}}", "time_12:00", "user_id"]
+        message = RequestPayloadUT(["MESSAGE_REQUEST", "{{"+CMD_ADD_HOME_FLAT_NR+"}}", "time_12:00", "user_id"])
         rq = Request(message)
         # first entering into chat
         # ->incoming() with ViberMessageRequest called
@@ -315,7 +351,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.state == 'IDENTIFY')
         self.assertTrue(rq._user_identified is False)
         self.assertTrue(rq._user_confirmed is False)
-        self.assertTrue(rq.need_input() is True)
+        self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_IDENTIFY__NEW_USER)
         self.assertTrue(rq.get_kbd().eq(Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
                                                   Keyboard.cmd_button(CMD_ADD_NAME),
@@ -329,7 +365,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.need_input() is True)
         self.assertTrue(rq.get_message_out() == TXT_ADD_HOME_FL_NR)
         self.assertTrue(rq.get_kbd().eq(Keyboard([])))
-        message[1] = '4Д,197'
+        message._payload[1] = '4Д,197'
 
         rq.advance()
         self.assertTrue(rq.state == 'GOT_HOME_FL_NR')
@@ -337,7 +373,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq._user_confirmed is False)
         self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_GOT_HOME_FL_NR)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        self.assertTrue(rq.get_kbd().eq(KBD_ALL_KEYS))
 
         rq.advance()
         self.assertTrue(rq.state == 'UPDATE_DB')
@@ -345,7 +381,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq._user_confirmed is False)
         self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_GOT_HOME_FL_NR)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        self.assertTrue(rq.get_kbd().eq(KBD_ALL_KEYS))
 
         rq.advance()
         self.assertTrue(rq.state == 'DELETE')
@@ -353,7 +389,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.need_input() is True)
 
     def test_success_AddCarNr(self):
-        message = ["MESSAGE_REQUEST", "{{"+CMD_ADD_CAR_NR+"}}", "time_12:00", "user_id"]
+        message = RequestPayloadUT(["MESSAGE_REQUEST", "{{"+CMD_ADD_CAR_NR+"}}", "time_12:00", "user_id"])
         rq = Request(message)
         # first entering into chat
         # ->incoming() with ViberMessageRequest called
@@ -364,7 +400,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.state == 'IDENTIFY')
         self.assertTrue(rq._user_identified is False)
         self.assertTrue(rq._user_confirmed is False)
-        self.assertTrue(rq.need_input() is True)
+        self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_IDENTIFY__NEW_USER)
         self.assertTrue(rq.get_kbd().eq(Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
                                                   Keyboard.cmd_button(CMD_ADD_NAME),
@@ -378,7 +414,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.need_input() is True)
         self.assertTrue(rq.get_message_out() == TXT_ADD_CAR_NR)
         self.assertTrue(rq.get_kbd().eq(Keyboard([])))
-        message[1] = 'вн1984не'
+        message._payload[1] = 'вн1984не'
 
         rq.advance()
         self.assertTrue(rq.state == 'GOT_CAR_NR')
@@ -386,7 +422,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq._user_confirmed is False)
         self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_GOT_CAR_NR)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        self.assertTrue(rq.get_kbd().eq(KBD_ALL_KEYS))
 
         rq.advance()
         self.assertTrue(rq.state == 'UPDATE_DB')
@@ -394,7 +430,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq._user_confirmed is False)
         self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_GOT_CAR_NR)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        self.assertTrue(rq.get_kbd().eq(KBD_ALL_KEYS))
 
         rq.advance()
         self.assertTrue(rq.state == 'DELETE')
@@ -402,7 +438,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.need_input() is True)
 
     def test_success_AddName(self):
-        message = ["MESSAGE_REQUEST", "{{"+CMD_ADD_NAME+"}}", "time_12:00", "user_id"]
+        message = RequestPayloadUT(["MESSAGE_REQUEST", "{{"+CMD_ADD_NAME+"}}", "time_12:00", "user_id"])
         rq = Request(message)
         # first entering into chat
         # ->incoming() with ViberMessageRequest called
@@ -413,12 +449,9 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.state == 'IDENTIFY')
         self.assertTrue(rq._user_identified is False)
         self.assertTrue(rq._user_confirmed is False)
-        self.assertTrue(rq.need_input() is True)
+        self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_IDENTIFY__NEW_USER)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
-                                                  Keyboard.cmd_button(CMD_ADD_NAME),
-                                                  Keyboard.cmd_button(CMD_ADD_CAR_NR),
-                                                  Keyboard.cmd_button(CMD_ADD_HOME_FLAT_NR)])))
+        self.assertTrue(rq.get_kbd().eq(KBD_ALL_KEYS))
 
         rq.advance()
         self.assertTrue(rq.state == 'ADD_NAME')
@@ -427,7 +460,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq.need_input() is True)
         self.assertTrue(rq.get_message_out() == TXT_ADD_NAME)
         self.assertTrue(rq.get_kbd().eq(Keyboard([])))
-        message[1] = 'Анатолий'
+        message._payload[1] = 'Анатолий'
 
         rq.advance()
         self.assertTrue(rq.state == 'GOT_NAME')
@@ -435,7 +468,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq._user_confirmed is False)
         self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_GOT_NAME)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        self.assertTrue(rq.get_kbd().eq(KBD_ALL_KEYS))
 
         rq.advance()
         self.assertTrue(rq.state == 'UPDATE_DB')
@@ -443,7 +476,7 @@ class TestRequest(unittest.TestCase):
         self.assertTrue(rq._user_confirmed is False)
         self.assertTrue(rq.need_input() is False)
         self.assertTrue(rq.get_message_out() == TXT_GOT_NAME)
-        self.assertTrue(rq.get_kbd().eq(Keyboard([])))
+        self.assertTrue(rq.get_kbd().eq(KBD_ALL_KEYS))
 
         rq.advance()
         self.assertTrue(rq.state == 'DELETE')

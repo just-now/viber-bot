@@ -43,6 +43,9 @@ class Keyboard(object):
     def to_viber_keys(self):
         pass
 
+    def to_ut_str(self):
+        return ' '.join(list(map(lambda x: x['Text'], self._buttons)))
+
     @staticmethod
     def cmd_button(name):
         return {'ActionType':'reply',

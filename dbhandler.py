@@ -70,7 +70,7 @@ class DBHandler(object):
         user.save()
 
     def addEstate(self, v_id_, home_nr_, flat_nr_):
-        user = User.select().where(User.v_id == v_id).get()
+        user = User.select().where(User.v_id == v_id_).get()
         estate = Estate.create(owner=user, flat_nr=flat_nr_, home_nr=home_nr_,
                                reg_date=datetime.datetime.now())
         estate.save()
