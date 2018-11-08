@@ -10,6 +10,7 @@ from rutils import RequestPayloadUT
 import re
 import unittest
 import datetime
+import asyncio
 
 
 CMD_REG_TEL          = "Register"
@@ -254,8 +255,52 @@ class Request(object):
     def update_payload(self, payload):
         self._payload = payload
 
-    def __init__(self, payload):
-        self._payload = payload
+    async def co_get_message(self):
+        print("co_get_message 1")
+        self._future = _loop.create_future()
+        print("co_get_message 2")
+        self._loop.stop()
+        print("co_get_message 3")
+        await self._future
+        print("co_get_message 4")
+        return self._future.result()
+        print("co_get_message 5")
+
+    async def co_run_task(self):
+        print("co_run_task()")
+
+        message = await self.co_get_message()
+        # indentifying user
+        self._user_identified = False
+        self._user_confirmed  = False
+        # parse commands
+        if self.is_reg_tel_cmd():
+            self._need_input  = True
+            self._message_out = TXT_REG_TEL_NR
+            self._kb_out = Keyboard([])
+            message = await self.co_get_message()
+            # inside the message we got tel nr from user
+            if self.is_tel_nr_valid():
+                #update db
+                pass
+            else:
+                #send user error message
+                pass
+
+        elif self.is_add_home_flat_cmd():
+            pass
+        elif self.is_add_car_cmd():
+            pass
+        elif self.is_add_name_cmd():
+            pass
+        else:
+            pass
+        #---
+
+        self._loop.stop()
+
+    def __init__(self, loop):
+        # self._payload = payload
         self._message_out = None
         self._kb_out = None
 
@@ -270,8 +315,17 @@ class Request(object):
         self._confirmation_code=''
         self._user_home_flat=''
 
-        self._init_sm()
+        # self._init_sm()
 
+        self._loop = loop
+        self._task = loop.create_task(self.co_run_task())
+        self._loop.run_forever()
+
+
+    def advance(self, payload):
+        self._future.set_result(payload)
+        self._loop.run_forever()
+        return self._need_output
 
 if __name__ == '__main__':
     unittest.main()

@@ -2,6 +2,7 @@ from request import Request
 from rutils import RequestPayloadUT
 import request
 import unittest
+import asyncio
 
 class bcolors:
     HEADER = '\033[95m'
@@ -17,20 +18,22 @@ class bcolors:
 class RequestHandler(object):
 
     def __init__(self):
-        self._req_queue = {}
+        self._req_map = {}
+        self._loop = asyncio.get_event_loop()
+        self._loop.set_debug(enabled=True)
 
     def find_by_vid(self, vid):
         """Finds request inside reqh queues by viber id `vid'"""
-        return self._req_queue.get(vid)
+        return self._req_map.get(vid)
 
-    def new(self, vid, payload):
+    def new(self, vid):
         """Creates new request and appends it into reqh queues"""
-        self._req_queue[vid] = Request(payload)
-        return self._req_queue[vid]
+        self._req_map[vid] = Request(self._loop)
+        return self._req_map[vid]
 
     def delete(self, vid):
         """Deletes request from reqh queues"""
-        self._req_queue.pop(vid)
+        self._req_map.pop(vid)
 
     def send(self, rq):
         print(bcolors.WARNING+"<<<")
@@ -42,40 +45,13 @@ class RequestHandler(object):
     def process(self, payload):
         rq = self.find_by_vid(payload.user_id())
         if rq is None:
-            rq = self.new(payload.user_id(), payload)
-        else:
-            rq.update_payload(payload)
+            rq = self.new(payload.user_id())
 
-        while True:
-            rq.advance()
-            if rq.need_output():
-                self.send(rq)
-            if rq.need_input():
-                break
+        if rq.advance(payload):
+            self.send(rq)
 
         if rq.finished():
             self.delete(payload.user_id())
-
-#---- ##############################
-
-def _called_by_incoming1(rq):
-    yield rq.context
-
-def _called_by_incoming2(rq):
-    yield rq.context
-
-def _incoming(rq):
-    _called_by_incoming1(rq)
-    _called_by_incoming2(rq)
-
-def main():
-    rq = Rq()
-    rq.context = _incoming(rq)
-    #     _called_by_incoming1(rq) called
-    rq.context = next(rq.context)
-    #     _called_by_incoming2(rq) called
-
-#---- ##############################
 
 class TestRequestHandler(unittest.TestCase):
 
