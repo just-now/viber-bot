@@ -56,6 +56,26 @@ class RequestHandler(object):
         if rq.finished():
             self.delete(payload.user_id())
 
+#---- ##############################
+
+def _called_by_incoming1(rq):
+    yield rq.context
+
+def _called_by_incoming2(rq):
+    yield rq.context
+
+def _incoming(rq):
+    _called_by_incoming1(rq)
+    _called_by_incoming2(rq)
+
+def main():
+    rq = Rq()
+    rq.context = _incoming(rq)
+    #     _called_by_incoming1(rq) called
+    rq.context = next(rq.context)
+    #     _called_by_incoming2(rq) called
+
+#---- ##############################
 
 class TestRequestHandler(unittest.TestCase):
 

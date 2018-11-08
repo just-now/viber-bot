@@ -1,0 +1,37 @@
+@startuml
+
+participant WebService
+participant Flask
+participant RequestHander
+participant Request
+participant DB
+participant ViberApi
+note over WebService, RequestHander
+Example1
+end note
+
+WebService --> Flask : incoming(message, user_id, time)
+Flask -> RequestHander : processMessage(message, user_id, time)
+RequestHander -> Request : rq = newRequest(message, user_id, time)
+RequestHander -> RequestHander : addRequestQueue(rq)
+
+note over WebService, RequestHander
+Example2
+end note
+
+WebService --> Flask : incoming(message='{Registration}', user_id='2232', time='10:20')
+Flask -> RequestHander : processMessage(message='{Registration}', user_id='2232', time='10:20')
+RequestHander -> RequestHander : findRequestByUID(user_id) // no request yet return None
+RequestHander -> Request: rq = newRequest(message='{Registration}', user_id='2232', time='10:20')
+RequestHander -> RequestHander : addRequestQueue(rq)
+RequestHander -> Request: rq.advance() // state=IDENTIFY
+RequestHander -> Request: rq.need_input() // False
+
+Request -> DB: user_id_exists(rq.user_id) // None
+RequestHander -> Request: rq.advance() // state=REGISTRATION
+RequestHander -> Request: rq.need_input() // True
+RequestHander -> Request: rq.prepare_data_to_send()
+
+Flask -> ViberApi : viber.send_messages(rq.get_prepared_data())
+
+@enduml
