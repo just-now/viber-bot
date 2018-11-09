@@ -250,54 +250,62 @@ class Request(object):
         return self.need_input() or self._need_output
 
     def finished(self):
-        return self.state == "DELETE"
+        return self._finished
 
     def update_payload(self, payload):
         self._payload = payload
 
     async def co_get_message(self):
-        print("co_get_message 1")
-        self._future = _loop.create_future()
-        print("co_get_message 2")
+        self._future = self._loop.create_future()
         self._loop.stop()
-        print("co_get_message 3")
         await self._future
-        print("co_get_message 4")
+        self.update_payload(self._future.result())
         return self._future.result()
-        print("co_get_message 5")
 
     async def co_run_task(self):
         print("co_run_task()")
+        try:
+            # indentifying user
+            self._user_identified = False
+            self._user_confirmed  = False
 
-        message = await self.co_get_message()
-        # indentifying user
-        self._user_identified = False
-        self._user_confirmed  = False
-        # parse commands
-        if self.is_reg_tel_cmd():
-            self._need_input  = True
-            self._message_out = TXT_REG_TEL_NR
-            self._kb_out = Keyboard([])
+            self._need_output     = True
+            self._message_out     = TXT_IDENTIFY__NEW_USER
+            self._kb_out          = KBD_ALL_KEYS
             message = await self.co_get_message()
-            # inside the message we got tel nr from user
-            if self.is_tel_nr_valid():
-                #update db
+
+            # parse commands
+            if self.is_reg_tel_cmd():
+                self._need_input  = True
+                self._message_out = TXT_REG_TEL_NR
+                self._kb_out = Keyboard([])
+                message = await self.co_get_message()
+                # inside the message we got tel nr from user
+                if self.is_tel_nr_valid():
+                    #update db
+                    print("valid tel nr")
+                    print("update db")
+                    pass
+                else:
+                    #send user error message
+                    print("invalid tel nr")
+                    pass
+
+            elif self.is_add_home_flat_cmd():
+                pass
+            elif self.is_add_car_cmd():
+                pass
+            elif self.is_add_name_cmd():
                 pass
             else:
-                #send user error message
-                pass
-
-        elif self.is_add_home_flat_cmd():
-            pass
-        elif self.is_add_car_cmd():
-            pass
-        elif self.is_add_name_cmd():
-            pass
-        else:
-            pass
-        #---
-
-        self._loop.stop()
+                print("Unknown command!")
+            #---
+        except Exception as e:
+            print("Something wrong happened! {}".format(e))
+        finally:
+            self._loop.stop()
+            print("Coroutine finished")
+            self._finished = True
 
     def __init__(self, loop):
         # self._payload = payload
@@ -309,6 +317,7 @@ class Request(object):
         self._user_blocked = None
         self._need_input = False
         self._need_output = False
+        self._finished = False
 
         self._user_telephone=''
         self._user_name=''
@@ -319,8 +328,9 @@ class Request(object):
 
         self._loop = loop
         self._task = loop.create_task(self.co_run_task())
+        #print(">>>")
         self._loop.run_forever()
-
+        #print("<<<")
 
     def advance(self, payload):
         self._future.set_result(payload)

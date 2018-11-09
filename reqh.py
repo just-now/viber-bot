@@ -1,4 +1,5 @@
-from request2 import Request2
+#from request2 import Request2
+from request import Request
 from rutils import RequestPayloadUT
 import request2
 import unittest
@@ -26,7 +27,7 @@ class RequestHandler(object):
 
     def new(self, vid):
         """Creates new request and appends it into reqh queues"""
-        self._req_map[vid] = Request2()
+        self._req_map[vid] = Request(asyncio.get_event_loop())
         return self._req_map[vid]
 
     def delete(self, vid):
@@ -42,54 +43,57 @@ class RequestHandler(object):
 
     def process(self, payload):
         rq = self.find_by_vid(payload.user_id())
+        #print("process rq is None")
         if rq is None:
             rq = self.new(payload.user_id())
-
+        #print("process rq advance")
         if rq.advance(payload):
             self.send(rq)
-
+        #print("process rq finished")
         if rq.finished():
             self.delete(payload.user_id())
 
 class TestRequestHandler(unittest.TestCase):
 
     def incoming(self, reqh, payload):
-        print(">>>.{}".format(payload.user_id()))
+        #print(">>>.{}".format(payload.user_id()))
         reqh.process(payload)
-        print("<<<")
+        #print("<<<")
 
     def test_XXX(self):
         reqh = RequestHandler()
 
-        self.incoming(reqh, RequestPayloadUT([0,0,0,1]))
-        self.incoming(reqh, RequestPayloadUT([0,0,0,2]))
-        self.incoming(reqh, RequestPayloadUT([0,0,0,1]))
-        self.incoming(reqh, RequestPayloadUT([0,0,0,2]))
+        # 1
+        # self.incoming(reqh, RequestPayloadUT([0,0,0,1]))
+        # self.incoming(reqh, RequestPayloadUT([0,0,0,2]))
+        # self.incoming(reqh, RequestPayloadUT([0,0,0,1]))
+        # self.incoming(reqh, RequestPayloadUT([0,0,0,2]))
 
-        # self.incoming(reqh, RequestPayloadUT(["ViberConversationStartedRequest",
-        #                                       "", "time_12:00", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "{{"+"Register"+"}}", "time_12:01", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "+38066-7176666", "time_12:01", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "{{"+"Register"+"}}", "time_12:01", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "+380667176666", "time_12:01", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "{{"+"AddHomeFlat"+"}}", "time_12:01", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "4д,197", "time_12:01", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "{{"+"AddName"+"}}", "time_12:01", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "Vasiliy", "time_12:01", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "{{"+""+"}}", "time_12:01", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "{{"+"AddCar"+"}}", "time_12:01", "22322"]))
-        # self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
-        #                                       "VN1929VV", "time_12:01", "22322"]))
+        # 2
+        self.incoming(reqh, RequestPayloadUT(["ViberConversationStartedRequest",
+                                              "", "time_12:00", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "{{"+"Register"+"}}", "time_12:01", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "+38066-7176666", "time_12:01", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "{{"+"Register"+"}}", "time_12:01", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "+380667176666", "time_12:01", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "{{"+"AddHomeFlat"+"}}", "time_12:01", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "4д,197", "time_12:01", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "{{"+"AddName"+"}}", "time_12:01", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "Vasiliy", "time_12:01", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "{{"+""+"}}", "time_12:01", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "{{"+"AddCar"+"}}", "time_12:01", "22322"]))
+        self.incoming(reqh, RequestPayloadUT(["ViberMessageRequest",
+                                              "VN1929VV", "time_12:01", "22322"]))
 
 if __name__ == '__main__':
     unittest.main()
