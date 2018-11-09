@@ -7,8 +7,9 @@ class EventLoop(object):
         print(idx + "N1", flush=True)
         loop.stop()
         await m[idx]
-        raise ValueError("123")
+        #raise ValueError("123")
         print(idx + "N2", flush=True)
+        return "112233"
 
 
     async def co_first(self, idx, m, loop):
@@ -19,7 +20,8 @@ class EventLoop(object):
             await m[idx]
             print(idx + "2", flush=True)
 
-            await self.co_first_nested(idx, m, loop)
+            x = await self.co_first_nested(idx, m, loop)
+            print("###"+x)
             #
             loop.stop()
         except Exception as e:
@@ -39,11 +41,8 @@ class EventLoop(object):
         m["task 2: "].set_result(22)
         loop.run_forever()
 
-        m["task 1: "].set_result(11)
-        loop.run_forever()
-
         print("---");
-        #m["task 1: "].set_result(11)
+        m["task 1: "].set_result(11)
         m["task 2: "].set_result(22)
         loop.run_forever()
         print("---");
