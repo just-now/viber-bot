@@ -1,4 +1,3 @@
-#from request2 import Request2
 from request import Request
 from rutils import RequestPayloadUT
 import request2
@@ -20,6 +19,7 @@ class RequestHandler(object):
 
     def __init__(self):
         self._req_map = {}
+        self._loop = asyncio.get_event_loop()
 
     def find_by_vid(self, vid):
         """Finds request inside reqh queues by viber id `vid'"""
@@ -27,7 +27,7 @@ class RequestHandler(object):
 
     def new(self, vid):
         """Creates new request and appends it into reqh queues"""
-        self._req_map[vid] = Request(asyncio.get_event_loop())
+        self._req_map[vid] = Request(self._loop)
         return self._req_map[vid]
 
     def delete(self, vid):
@@ -43,22 +43,20 @@ class RequestHandler(object):
 
     def process(self, payload):
         rq = self.find_by_vid(payload.user_id())
-        #print("process rq is None")
+
         if rq is None:
             rq = self.new(payload.user_id())
-        #print("process rq advance")
+
         if rq.advance(payload):
             self.send(rq)
-        #print("process rq finished")
+
         if rq.finished():
             self.delete(payload.user_id())
 
 class TestRequestHandler(unittest.TestCase):
 
     def incoming(self, reqh, payload):
-        #print(">>>.{}".format(payload.user_id()))
         reqh.process(payload)
-        #print("<<<")
 
     def test_XXX(self):
         reqh = RequestHandler()

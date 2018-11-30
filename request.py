@@ -1,13 +1,8 @@
-from transitions.extensions import GraphMachine as Machine
-#model.get_graph().draw('my_state_diagram.png', prog='dot')
-
-#from transitions import Machine
-from transitions import State
 from keyboard import Keyboard
 from rutils import RequestPayloadUT
 
-
 import re
+import sys
 import unittest
 import datetime
 import asyncio
@@ -57,7 +52,9 @@ KBD_ALL_KEYS=Keyboard([Keyboard.cmd_button(CMD_REG_TEL),
                        Keyboard.cmd_button(CMD_ADD_CAR_NR),
                        Keyboard.cmd_button(CMD_ADD_HOME_FLAT_NR)])
 
-# ---
+class Utils(object):
+    pass
+
 class Request(object):
 
     # --- validity checks ---
@@ -105,161 +102,19 @@ class Request(object):
     def db_failed(self):
         return False
 
-    # --- on enter ---
-    def on_enter_IDENTIFY(self):
-        print("on_enter state={}".format(self.state))
-        # put sql queries into data base
-        # check user is present inside data base tables
-        # set _user_identified and _user_confirmed to an appropriate state according to db
-        self._user_identified = False
-        self._user_confirmed  = False
-        self._need_input      = False
-        self._need_output     = True
-        self._message_out     = TXT_IDENTIFY__NEW_USER
-        self._kb_out          = KBD_ALL_KEYS
-    # ---
     def generateConfirmationCode(self):
         stime = str(datetime.datetime.timestamp(datetime.datetime.now()))
         return str(stime).replace('.','')[-5:]
 
-    def on_enter_REG_TEL_NR(self):
-        print("on_enter state={}".format(self.state))
-        self._need_input  = True
-        self._message_out = TXT_REG_TEL_NR
-        self._kb_out = Keyboard([])
+    # ---- Private ----
 
-    def on_enter_GOT_TEL_NR(self):
-        print("on_enter state={}".format(self.state))
-        self._confirmation_code = self.generateConfirmationCode()
-        self._need_input        = False
-        self._need_output       = False
-        self._message_out       = TXT_GOT_TEL_NR
-        self._kb_out            = KBD_ALL_KEYS
-    # ---
-    def on_enter_ADD_HOME_FL_NR(self):
-        print("on_enter state={}".format(self.state))
-        self._need_input  = True
-        self._message_out = TXT_ADD_HOME_FL_NR
-        self._kb_out = Keyboard([])
-
-    def on_enter_GOT_HOME_FL_NR(self):
-        self._need_input  = False
-        self._need_output = False
-        self._message_out = TXT_GOT_HOME_FL_NR
-        self._kb_out      = KBD_ALL_KEYS
-        pass
-    # ---
-    def on_enter_ADD_CAR_NR(self):
-        print("on_enter state={}".format(self.state))
-        self._need_input  = True
-        self._message_out = TXT_ADD_CAR_NR
-        self._kb_out = Keyboard([])
-
-    def on_enter_GOT_CAR_NR(self):
-        self._need_input  = False
-        self._need_output = False
-        self._message_out = TXT_GOT_CAR_NR
-        self._kb_out      = KBD_ALL_KEYS
-        pass
-    # ---
-    def on_enter_ADD_NAME(self):
-        print("on_enter state={}".format(self.state))
-        self._need_input  = True
-        self._message_out = TXT_ADD_NAME
-        self._kb_out = Keyboard([])
-
-    def on_enter_GOT_NAME(self):
-        self._need_input  = False
-        self._need_output = False
-        self._message_out = TXT_GOT_NAME
-        self._kb_out      = KBD_ALL_KEYS
-        pass
-    # ---
-    def on_enter_UPDATE_DB(self):
-        print("on_enter state={}".format(self.state))
-        self._need_output = False
-        self._need_input  = False
-
-    def on_enter_ERROR(self):
-        print("on_enter state={}".format(self.state))
-        self._message_out = ERR_GENERAL
-        self._kb_out      = KBD_ALL_KEYS
-        self._need_output = False
-        self._need_input  = False
-
-    def on_enter_DELETE(self):
-        print("on_enter state={}".format(self.state))
-        self._need_input = True
-
-    def _init_sm(self):
-        states = ['NEW', 'IDENTIFY',
-
-                  'REG_TEL_NR',     'GOT_TEL_NR',
-                  'ADD_HOME_FL_NR', 'GOT_HOME_FL_NR',
-                  'ADD_CAR_NR',     'GOT_CAR_NR',
-                  'ADD_NAME',       'GOT_NAME',
-
-                  'UPDATE_DB',
-                  'DELETE',
-                  'ERROR']
-        #self._machine = Machine(model=self, states=states, initial='NEW')
-        self._machine = Machine(model=self, states=states, initial='NEW', show_conditions=True)
-        self._machine.add_transition('advance', 'NEW',                'IDENTIFY')
-        # --- IDENTIFY to ALL
-        self._machine.add_transition('advance', 'IDENTIFY',           'REG_TEL_NR')
-        self._machine.add_transition('advance', 'IDENTIFY',           'ADD_HOME_FL_NR')
-        self._machine.add_transition('advance', 'IDENTIFY',           'ADD_CAR_NR')
-        self._machine.add_transition('advance', 'IDENTIFY',           'ADD_NAME')
-        self._machine.add_transition('slipup',  'IDENTIFY',           'ERROR')
-        # --- TEL_NRs
-        self._machine.add_transition('advance', 'REG_TEL_NR',         'GOT_TEL_NR')
-        self._machine.add_transition('advance', 'GOT_TEL_NR',         'UPDATE_DB')
-        self._machine.add_transition('slipup',  'REG_TEL_NR',         'ERROR')
-        # --- HOME_FL_NRs
-        self._machine.add_transition('advance', 'ADD_HOME_FL_NR',     'GOT_HOME_FL_NR')
-        self._machine.add_transition('advance', 'GOT_HOME_FL_NR',     'UPDATE_DB')
-        self._machine.add_transition('slipup',  'ADD_HOME_FL_NR',     'ERROR')
-        # --- CAR_NRs
-        self._machine.add_transition('advance', 'ADD_CAR_NR',         'GOT_CAR_NR')
-        self._machine.add_transition('advance', 'GOT_CAR_NR',         'UPDATE_DB')
-        self._machine.add_transition('slipup',  'ADD_CAR_NR',         'ERROR')
-        # --- NAME_NRs
-        self._machine.add_transition('advance', 'ADD_NAME',           'GOT_NAME')
-        self._machine.add_transition('advance', 'GOT_NAME',           'UPDATE_DB')
-        self._machine.add_transition('slipup',  'ADD_NAME',           'ERROR')
-        #---
-        self._machine.add_transition('slipup',  'UPDATE_DB',          'ERROR')
-        self._machine.add_transition('advance', 'UPDATE_DB',          'DELETE')
-        self._machine.add_transition('advance', 'ERROR',              'DELETE')
-
-    # ---- Public ----
-
-    def get_kbd(self):
-        return self._kb_out
-
-    def get_message_out(self):
-        return self._message_out
-
-    def get_user_id(self):
-        self._payload.user_id()
-
-    def need_input(self):
-        return self._need_input
-
-    def need_output(self):
-        return self.need_input() or self._need_output
-
-    def finished(self):
-        return self._finished
-
-    def update_payload(self, payload):
+    def _update_payload(self, payload):
         self._payload = payload
 
     async def co_get_message(self):
         self._future = self._loop.create_future()
         self._loop.stop()
         await self._future
-        self.update_payload(self._future.result())
         return self._future.result()
 
     async def co_run_task(self):
@@ -272,14 +127,16 @@ class Request(object):
             self._need_output     = True
             self._message_out     = TXT_IDENTIFY__NEW_USER
             self._kb_out          = KBD_ALL_KEYS
-            message = await self.co_get_message()
+            incoming_payload = await self.co_get_message()
+            self._update_payload(incoming_payload)
 
             # parse commands
             if self.is_reg_tel_cmd():
                 self._need_input  = True
                 self._message_out = TXT_REG_TEL_NR
                 self._kb_out = Keyboard([])
-                message = await self.co_get_message()
+                incoming_payload = await self.co_get_message()
+                self._update_payload(incoming_payload)
                 # inside the message we got tel nr from user
                 if self.is_tel_nr_valid():
                     #update db
@@ -299,23 +156,36 @@ class Request(object):
                 pass
             else:
                 print("Unknown command!")
-            #---
         except Exception as e:
             print("Something wrong happened! {}".format(e))
+            sys.exit(1)
         finally:
             self._loop.stop()
             print("Coroutine finished")
             self._finished = True
 
+    # ---- Public ----
+
+    def get_kbd(self):
+        return self._kb_out
+
+    def get_message_out(self):
+        return self._message_out
+
+    def get_user_id(self):
+        self._payload.user_id()
+
+    def finished(self):
+        return self._finished
+
     def __init__(self, loop):
-        # self._payload = payload
+        self._payload = None
         self._message_out = None
         self._kb_out = None
 
         self._user_identified = None
         self._user_confirmed = None
         self._user_blocked = None
-        self._need_input = False
         self._need_output = False
         self._finished = False
 
@@ -324,13 +194,9 @@ class Request(object):
         self._confirmation_code=''
         self._user_home_flat=''
 
-        # self._init_sm()
-
         self._loop = loop
         self._task = loop.create_task(self.co_run_task())
-        #print(">>>")
         self._loop.run_forever()
-        #print("<<<")
 
     def advance(self, payload):
         self._future.set_result(payload)
